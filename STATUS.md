@@ -1,43 +1,45 @@
 # STATUS — Repo Guardian
 
-**آخر تحديث:** 2026-09-23 08:40 CET
+**آخر تحديث:** 2026-09-23 08:50 CET
 
-## ✅ الإجراءات المكتملة اليوم
+## ما تم اليوم
 
-| الإجراء | الحالة |
+### تنظيف
+| المستودع | الإجراء |
+|----------|--------|
+| `Repository-name-my-ai-platform` → `agentic-ai` | إعادة تسمية ✅ |
+| `ZYNTRA-storage` | أرشفة ✅ |
+| `forge-agent` | تعليم Deprecated + إغلاق Issues + توصية أرشفة |
+| README لـ `agentic-ai` | تحديث الروابط ✅ |
+
+### بناء النظام
+| المكوّن | الحالة |
 |---------|--------|
-| إعادة تسمية `Repository-name-my-ai-platform` → `agentic-ai` | ✅ تم |
-| أرشفة `ZYNTRA-storage` | ✅ تم (archived=true) |
-| تحديث README لـ `agentic-ai` (إزالة التحذير + تحديث الروابط) | ✅ تم |
-| إغلاق Issue #2 الخاصة بإعادة التسمية | ✅ تم |
-| إنشاء مستودع `repo-guardian` | ✅ تم |
-| إنشاء Issues للمشاريع الحرجة | ✅ تم |
+| `agent/monitor.py` | محرك مراقبة حقيقي (GitHub API + Vercel HEAD) |
+| `agent/healer.py` | إنشاء Issues تلقائي للحالات الحرجة |
+| `agent/decision.py` | قرار التنبيه (Critical فقط) |
+| `.github/workflows/health-check.yml` | تشغيل يومي + يدوي |
 
-## ⏳ ما ينتظر قرار
+## سياسة البريد / التنبيه
 
-| المستودع | الحالة | الإجراء المقترح |
-|----------|--------|------------------|
-| `forge-agent` | مفتوح + Issue #2 | تطوير أم أرشفة؟ |
+- **لا بريد أسبوعي روتيني**
+- تنبيه فقط عند `critical_count > 0`
+- Warnings تُسجَّل في Artifact و Job Summary فقط
 
-## المستودعات الحالية (عامة)
+## تشغيل يدوي
 
-- agentic-ai ✅
-- repo-guardian ✅
-- gabster-ai-agent-kit
-- nexusai-commerce
-- MirrorThread
-- e-myth-business-system
-- forge-agent (مراجعة)
-- content-scarcity-canvas
-- zyntra-flowbrief
-- zyntra-platform
-- free-claude-gateway
-- crypto-portfolio
-- ZYNTRA-storage (مؤرشف)
-- Zyntrabusinesszyntraal- (مؤرشف)
+من تبويب Actions في `repo-guardian` → **Repo Guardian Health Check** → Run workflow
 
-## سياسة البريد
+أو محلياً:
+```bash
+export GITHUB_TOKEN=ghp_xxx
+export GITHUB_OWNER=Johanne012
+python agent/monitor.py
+python agent/decision.py
+python agent/healer.py
+```
 
-لا يتم إرسال بريد إلا في الحالات:
-- Critical
-- Confirm (تحتاج موافقة بشرية)
+## الخطوة التالية للمالك
+
+1. أرشفة `forge-agent` يدوياً من Settings (ضغطة واحدة)
+2. (اختياري) تحديث اسم مشروع Vercel لـ agentic-ai

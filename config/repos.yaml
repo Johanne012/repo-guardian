@@ -1,16 +1,16 @@
-# قائمة المستودعات وأولوياتها
+# قائمة المستودعات وأولوياتها — محدّثة 2026-09-23
 
 owner: Johanne012
 
 repos:
-  - name: Repository-name-my-ai-platform
+  - name: agentic-ai
     priority: critical
-    action_needed: rename_to_agentic-ai
-    notes: اسم مؤقت، يجب تغييره فوراً
+    notes: المنصة الرئيسية بعد إعادة التسمية
+    live_url: https://repository-name-my-ai-platform.vercel.app
 
   - name: free-claude-gateway
     priority: high
-    notes: أقوى مشروع تقني حالياً
+    notes: أقوى مشروع تقني
 
   - name: zyntra-platform
     priority: high
@@ -38,15 +38,18 @@ repos:
   - name: content-scarcity-canvas
     priority: low
 
-  - name: forge-agent
-    priority: review
-    action_needed: decide_develop_or_archive
+  - name: repo-guardian
+    priority: system
+    notes: نظام المراقبة نفسه
 
-  - name: ZYNTRA-storage
+  - name: forge-agent
     priority: archive
     action_needed: archive
-    notes: Vercel 404 + قديم جداً
+    notes: هيكل أولي — تم تعليمه Deprecated
+
+  - name: ZYNTRA-storage
+    priority: archived
+    notes: مؤرشف
 
   - name: Zyntrabusinesszyntraal-
     priority: archived
-    notes: مؤرشف مسبقاً

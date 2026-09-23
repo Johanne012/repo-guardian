@@ -1,0 +1,2 @@
+# Repo Guardian — no external deps for core monitor
+# Uses Python stdlib only (urllib, json, datetime)

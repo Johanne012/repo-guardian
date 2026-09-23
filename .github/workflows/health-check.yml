@@ -1,0 +1,74 @@
+name: Repo Guardian Health Check
+
+on:
+  schedule:
+    # كل يوم الساعة 06:00 UTC (08:00 CET تقريباً)
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      auto_issue:
+        description: "Create issues for critical findings"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Monitor
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_OWNER: Johanne012
+          REPORT_PATH: report.json
+        run: |
+          python agent/monitor.py || true
+          # لا نفشل الـ job بسبب exit 1 — نقرأ التقرير لاحقاً
+
+      - name: Run Decision
+        env:
+          REPORT_PATH: report.json
+          SUMMARY_PATH: summary.md
+        run: python agent/decision.py
+
+      - name: Run Healer (create issues if critical)
+        if: github.event_name == 'workflow_dispatch' && inputs.auto_issue || github.event_name == 'schedule'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_OWNER: Johanne012
+          REPORT_PATH: report.json
+          AUTO_ISSUE: ${{ github.event_name == 'schedule' && 'true' || inputs.auto_issue }}
+        run: python agent/healer.py
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-report
+          path: |
+            report.json
+            summary.md
+            notify.flag
+          retention-days: 14
+
+      - name: Post summary to Job Summary
+        run: |
+          echo "## Repo Guardian" >> $GITHUB_STEP_SUMMARY
+          cat summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if critical (optional signal)
+        run: |
+          if [ -f notify.flag ] && [ "$(cat notify.flag)" = "yes" ]; then
+            echo "Critical issues found — see summary"
+            # لا نفشل الـ workflow حتى لا يزعج؛ التقرير موجود في Summary + Artifact
+          fi
