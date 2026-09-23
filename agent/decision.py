@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Repo Guardian — Decision
-يلخّص التقرير ويقرر هل يجب إرسال تنبيه (بريد / Issue ملخصة).
+يلخّص التقرير ويقرر هل يجب إرسال تنبيه (Critical فقط).
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ from typing import Any
 
 
 def should_notify(report: dict[str, Any]) -> bool:
-    """بريد/تنبيه فقط عند Critical أو Confirm."""
     return report.get("critical_count", 0) > 0
 
 
@@ -22,6 +21,7 @@ def summary_markdown(report: dict[str, Any]) -> str:
         f"",
         f"**Generated:** {report.get('generated_at')}",
         f"**Owner:** {report.get('owner')}",
+        f"**Authenticated:** {report.get('authenticated')}",
         f"",
         f"| Metric | Count |",
         f"|--------|-------|",
@@ -36,7 +36,11 @@ def summary_markdown(report: dict[str, Any]) -> str:
         lines.append("## Critical")
         lines.append("")
         for r in report["critical"]:
-            lines.append(f"- **{r['name']}** (score {r['score']}): {', '.join(r['issues'])} → `{r['action']}`")
+            priv = " 🔒" if r.get("private") else ""
+            lines.append(
+                f"- **{r['name']}**{priv} (score {r['score']}): "
+                f"{', '.join(r['issues'])} → `{r['action']}`"
+            )
         lines.append("")
 
     if report.get("warning"):
@@ -47,7 +51,7 @@ def summary_markdown(report: dict[str, Any]) -> str:
         lines.append("")
 
     lines.append("---")
-    lines.append("*Email/notification is sent only on Critical. Warnings are logged only.*")
+    lines.append("*Notification only on Critical. Warnings logged only.*")
     return "\n".join(lines)
 
 
@@ -66,7 +70,6 @@ def main() -> None:
     print()
     print(f"NOTIFY={notify}")
 
-    # Write flag for GitHub Actions
     with open("notify.flag", "w") as f:
         f.write("yes" if notify else "no")
 

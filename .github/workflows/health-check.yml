@@ -2,7 +2,7 @@ name: Repo Guardian Health Check
 
 on:
   schedule:
-    # كل يوم الساعة 06:00 UTC (08:00 CET تقريباً)
+    # كل يوم 06:00 UTC ≈ 08:00 CET
     - cron: "0 6 * * *"
   workflow_dispatch:
     inputs:
@@ -34,7 +34,6 @@ jobs:
           REPORT_PATH: report.json
         run: |
           python agent/monitor.py || true
-          # لا نفشل الـ job بسبب exit 1 — نقرأ التقرير لاحقاً
 
       - name: Run Decision
         env:
@@ -42,8 +41,7 @@ jobs:
           SUMMARY_PATH: summary.md
         run: python agent/decision.py
 
-      - name: Run Healer (create issues if critical)
-        if: github.event_name == 'workflow_dispatch' && inputs.auto_issue || github.event_name == 'schedule'
+      - name: Run Healer
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_OWNER: Johanne012
@@ -51,7 +49,18 @@ jobs:
           AUTO_ISSUE: ${{ github.event_name == 'schedule' && 'true' || inputs.auto_issue }}
         run: python agent/healer.py
 
-      - name: Upload report artifact
+      - name: Notify (webhooks if configured)
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python agent/notify.py
+        continue-on-error: true
+
+      - name: Update memory
+        run: python agent/memory.py
+        continue-on-error: true
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: health-report
@@ -59,16 +68,11 @@ jobs:
             report.json
             summary.md
             notify.flag
-          retention-days: 14
+            healer_actions.json
+          retention-days: 30
+          if-no-files-found: ignore
 
-      - name: Post summary to Job Summary
+      - name: Job Summary
         run: |
           echo "## Repo Guardian" >> $GITHUB_STEP_SUMMARY
-          cat summary.md >> $GITHUB_STEP_SUMMARY
-
-      - name: Fail if critical (optional signal)
-        run: |
-          if [ -f notify.flag ] && [ "$(cat notify.flag)" = "yes" ]; then
-            echo "Critical issues found — see summary"
-            # لا نفشل الـ workflow حتى لا يزعج؛ التقرير موجود في Summary + Artifact
-          fi
+          if [ -f summary.md ]; then cat summary.md >> $GITHUB_STEP_SUMMARY; fi

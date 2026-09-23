@@ -1,40 +1,41 @@
-# قواعد تقييم الصحة والخطورة
+# قواعد تقييم الصحة
 
 rules:
   - id: bad_name
-    description: اسم مستودع مؤقت أو سيء
-    pattern: "Repository-name|temp-|test-|untitled"
+    description: اسم مستودع مؤقت
+    patterns: ["Repository-name", "temp-", "untitled", "test-repo"]
     severity: critical
     action: confirm_rename
 
-  - id: vercel_404
-    description: رابط Vercel يعطي 404
+  - id: vercel_down
+    description: رابط Vercel يعطي 4xx أو خطأ
+    severity: critical
+    action: confirm_archive_or_fix
+
+  - id: skeleton_stale
+    description: هيكل صغير جداً ومهجور
     severity: critical
     action: confirm_archive
 
-  - id: no_activity_60d
-    description: لا يوجد push منذ أكثر من 60 يوماً
+  - id: no_activity_90d
+    description: لا push منذ 90+ يوم
     severity: warning
     action: log_only
 
-  - id: no_readme
-    description: لا يوجد README أو README فارغ
+  - id: very_stale_small
+    description: 180+ يوم وحجم صغير
     severity: critical
-    action: create_issue
+    action: confirm_archive
 
-  - id: empty_repo
-    description: حجم صغير جداً + ملفات قليلة
-    severity: warning
-    action: review
-
-  - id: open_issues_old
-    description: Issues مفتوحة لأكثر من 30 يوماً بدون رد
+  - id: many_issues
+    description: أكثر من 5 issues مفتوحة
     severity: warning
     action: log_only
 
 email_policy:
-  send_only_on:
-    - critical
-    - confirm
+  send_only_on: [critical, confirm]
   never_send_weekly_summary: true
-  never_send_info_or_warning: true
+  channels:
+    - github_issues   # افتراضي
+    - discord_webhook # اختياري عبر secret
+    - slack_webhook   # اختياري عبر secret

@@ -1,16 +1,16 @@
-# قائمة المستودعات وأولوياتها — محدّثة 2026-09-23
+# مستودعات Johanne012 — محدّثة 2026-09-23
 
 owner: Johanne012
 
 repos:
+  # --- أساسية ---
   - name: agentic-ai
     priority: critical
-    notes: المنصة الرئيسية بعد إعادة التسمية
+    notes: المنصة الرئيسية
     live_url: https://repository-name-my-ai-platform.vercel.app
 
   - name: free-claude-gateway
     priority: high
-    notes: أقوى مشروع تقني
 
   - name: zyntra-platform
     priority: high
@@ -29,6 +29,7 @@ repos:
     priority: medium
     live_url: https://zyntra-flowbrief.vercel.app
 
+  # --- وثائق / أدوات ---
   - name: gabster-ai-agent-kit
     priority: low
 
@@ -40,16 +41,32 @@ repos:
 
   - name: repo-guardian
     priority: system
-    notes: نظام المراقبة نفسه
 
+  # --- خاصة ---
+  - name: zyntra-marketplace
+    priority: medium
+    private: true
+
+  - name: Repository-name-api-server
+    priority: critical
+    private: true
+    action_needed: rename
+
+  - name: sima_business_ai
+    priority: medium
+    private: true
+
+  - name: nextjs-with-supabase
+    priority: low
+    private: true
+
+  # --- أرشفة ---
   - name: forge-agent
     priority: archive
     action_needed: archive
-    notes: هيكل أولي — تم تعليمه Deprecated
 
   - name: ZYNTRA-storage
     priority: archived
-    notes: مؤرشف
 
   - name: Zyntrabusinesszyntraal-
     priority: archived

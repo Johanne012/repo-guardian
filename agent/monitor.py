@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Repo Guardian — Monitor
-يجمع بيانات كل المستودعات من GitHub API ويحسب مؤشرات الصحة.
+يجمع بيانات كل المستودعات (عامة + خاصة عبر التوكن) من GitHub API
+ويحسب مؤشرات الصحة + فحص Vercel.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ API = "https://api.github.com"
 def _headers() -> dict[str, str]:
     h = {
         "Accept": "application/vnd.github+json",
-        "User-Agent": "repo-guardian",
+        "User-Agent": "repo-guardian/1.0",
         "X-GitHub-Api-Version": "2022-11-28",
     }
     if TOKEN:
@@ -47,7 +48,11 @@ def check_url(url: str | None) -> str:
     if not url:
         return "no_url"
     try:
-        req = urllib.request.Request(url, method="HEAD")
+        req = urllib.request.Request(
+            url,
+            method="HEAD",
+            headers={"User-Agent": "repo-guardian/1.0"},
+        )
         with urllib.request.urlopen(req, timeout=8) as r:
             return "ok" if r.status < 400 else f"http_{r.status}"
     except urllib.error.HTTPError as e:
@@ -57,12 +62,21 @@ def check_url(url: str | None) -> str:
 
 
 def fetch_all_repos() -> list[dict[str, Any]]:
+    """جلب كل المستودعات. مع التوكن: العامة + الخاصة. بدون توكن: العامة فقط."""
     repos: list[dict] = []
     page = 1
+    # /user/repos يحتاج auth ويرجع الخاصة أيضاً
+    base = "/user/repos" if TOKEN else f"/users/{OWNER}/repos"
+    extra = "&affiliation=owner" if TOKEN else ""
+
     while True:
-        batch = api_get(f"/users/{OWNER}/repos?per_page=100&page={page}&sort=updated")
+        path = f"{base}?per_page=100&page={page}&sort=updated{extra}"
+        batch = api_get(path)
         if not batch:
             break
+        # فلترة لمالك الحساب فقط عند استخدام /user/repos
+        if TOKEN:
+            batch = [r for r in batch if r.get("owner", {}).get("login") == OWNER]
         repos.extend(batch)
         if len(batch) < 100:
             break
@@ -74,17 +88,17 @@ def analyze(repo: dict[str, Any]) -> dict[str, Any]:
     name = repo["name"]
     pushed = repo.get("pushed_at")
     days = days_since(pushed)
-    homepage = repo.get("homepage") or ""
+    homepage = (repo.get("homepage") or "").strip()
     desc = (repo.get("description") or "").strip()
     size = repo.get("size") or 0
     archived = repo.get("archived", False)
     open_issues = repo.get("open_issues_count") or 0
+    private = repo.get("private", False)
 
     issues: list[str] = []
     severity = "info"
     action = "none"
 
-    # --- Rules ---
     if archived:
         return {
             "name": name,
@@ -94,10 +108,15 @@ def analyze(repo: dict[str, Any]) -> dict[str, Any]:
             "action": "none",
             "days_since_push": days,
             "vercel": "skipped",
+            "private": private,
+            "stars": repo.get("stargazers_count", 0),
+            "language": repo.get("language"),
+            "html_url": repo.get("html_url"),
+            "archived": True,
         }
 
-    bad_name_patterns = ("Repository-name", "temp-", "untitled", "test-repo")
-    if any(p in name for p in bad_name_patterns):
+    bad_name_patterns = ("Repository-name", "temp-", "untitled", "test-repo", "Fictional")
+    if any(p.lower() in name.lower() for p in bad_name_patterns):
         issues.append(f"bad_name:{name}")
         severity = "critical"
         action = "confirm_rename"
@@ -108,6 +127,14 @@ def analyze(repo: dict[str, Any]) -> dict[str, Any]:
             severity = "warning"
         if action == "none":
             action = "review_or_archive"
+
+    if size < 15 and days is not None and days > 30:
+        # هيكل أولي مهجور
+        if "nearly_empty" not in issues and size <= 10:
+            issues.append("skeleton_stale")
+            severity = "critical" if days > 45 else "warning"
+            if action == "none":
+                action = "confirm_archive"
 
     if days is not None and days > 90:
         issues.append(f"stale_{days}d")
@@ -132,13 +159,13 @@ def analyze(repo: dict[str, Any]) -> dict[str, Any]:
         if severity == "info":
             severity = "warning"
 
-    score = 100
+    score = 90
     if severity == "warning":
-        score = 60
+        score = 55
     if severity == "critical":
-        score = 25
+        score = 20
     if not issues:
-        score = 90
+        score = 95
 
     return {
         "name": name,
@@ -148,10 +175,12 @@ def analyze(repo: dict[str, Any]) -> dict[str, Any]:
         "action": action,
         "days_since_push": days,
         "vercel": vercel_status,
+        "private": private,
         "stars": repo.get("stargazers_count", 0),
         "language": repo.get("language"),
         "html_url": repo.get("html_url"),
         "archived": archived,
+        "size": size,
     }
 
 
@@ -163,9 +192,10 @@ def run() -> dict[str, Any]:
     warning = [r for r in results if r["severity"] == "warning"]
     ok = [r for r in results if r["severity"] == "info"]
 
-    report = {
+    return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "owner": OWNER,
+        "authenticated": bool(TOKEN),
         "total": len(results),
         "critical_count": len(critical),
         "warning_count": len(warning),
@@ -174,7 +204,6 @@ def run() -> dict[str, Any]:
         "warning": warning,
         "all": results,
     }
-    return report
 
 
 def main() -> None:
@@ -183,14 +212,16 @@ def main() -> None:
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
-    print(f"Repos Guardian Report — {report['generated_at']}")
-    print(f"Total: {report['total']} | Critical: {report['critical_count']} | Warning: {report['warning_count']} | OK: {report['ok_count']}")
+    print(f"Repo Guardian Report — {report['generated_at']}")
+    print(f"Auth: {report['authenticated']} | Total: {report['total']} | "
+          f"Critical: {report['critical_count']} | Warning: {report['warning_count']} | OK: {report['ok_count']}")
     print()
 
     if report["critical"]:
         print("=== CRITICAL ===")
         for r in report["critical"]:
-            print(f"  [{r['score']}] {r['name']}: {', '.join(r['issues'])} → {r['action']}")
+            priv = " [private]" if r.get("private") else ""
+            print(f"  [{r['score']}] {r['name']}{priv}: {', '.join(r['issues'])} → {r['action']}")
         print()
 
     if report["warning"]:
@@ -199,7 +230,6 @@ def main() -> None:
             print(f"  [{r['score']}] {r['name']}: {', '.join(r['issues'])}")
         print()
 
-    # Exit code 1 if critical (useful for CI)
     if report["critical_count"] > 0:
         sys.exit(1)
     sys.exit(0)

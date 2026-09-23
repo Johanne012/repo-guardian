@@ -1,45 +1,39 @@
 # STATUS — Repo Guardian
 
-**آخر تحديث:** 2026-09-23 08:50 CET
+**آخر تحديث:** 2026-09-23 14:05 CET
 
-## ما تم اليوم
+## مكتمل
 
-### تنظيف
-| المستودع | الإجراء |
-|----------|--------|
-| `Repository-name-my-ai-platform` → `agentic-ai` | إعادة تسمية ✅ |
-| `ZYNTRA-storage` | أرشفة ✅ |
-| `forge-agent` | تعليم Deprecated + إغلاق Issues + توصية أرشفة |
-| README لـ `agentic-ai` | تحديث الروابط ✅ |
+| البند | الحالة |
+|------|--------|
+| إعادة تسمية → `agentic-ai` | ✅ |
+| أرشفة `ZYNTRA-storage` | ✅ |
+| إغلاق Issue الأرشفة | ✅ |
+| تعليم `forge-agent` Deprecated | ✅ |
+| Issue لإعادة تسمية `Repository-name-api-server` | ✅ |
+| محرك Monitor (عام + خاص) | ✅ |
+| Healer مع dedupe | ✅ |
+| Decision + notify.flag | ✅ |
+| Discord/Slack webhooks (اختياري) | ✅ |
+| Memory module | ✅ |
+| GitHub Actions يومي | ✅ |
+| LICENSE + .gitignore + run_local.sh | ✅ |
 
-### بناء النظام
-| المكوّن | الحالة |
-|---------|--------|
-| `agent/monitor.py` | محرك مراقبة حقيقي (GitHub API + Vercel HEAD) |
-| `agent/healer.py` | إنشاء Issues تلقائي للحالات الحرجة |
-| `agent/decision.py` | قرار التنبيه (Critical فقط) |
-| `.github/workflows/health-check.yml` | تشغيل يومي + يدوي |
+## ينتظر المالك (يدوي)
 
-## سياسة البريد / التنبيه
+1. أرشفة `forge-agent` من Settings → Danger Zone
+2. إعادة تسمية `Repository-name-api-server` (خاص)
+3. (اختياري) إضافة secrets في repo-guardian:
+   - `DISCORD_WEBHOOK_URL`
+   - `SLACK_WEBHOOK_URL`
 
-- **لا بريد أسبوعي روتيني**
-- تنبيه فقط عند `critical_count > 0`
-- Warnings تُسجَّل في Artifact و Job Summary فقط
+## تشغيل
 
-## تشغيل يدوي
+- تلقائي: يومياً 06:00 UTC
+- يدوي: Actions → Repo Guardian Health Check → Run workflow
+- محلي: `bash scripts/run_local.sh`
 
-من تبويب Actions في `repo-guardian` → **Repo Guardian Health Check** → Run workflow
+## سياسة التنبيه
 
-أو محلياً:
-```bash
-export GITHUB_TOKEN=ghp_xxx
-export GITHUB_OWNER=Johanne012
-python agent/monitor.py
-python agent/decision.py
-python agent/healer.py
-```
-
-## الخطوة التالية للمالك
-
-1. أرشفة `forge-agent` يدوياً من Settings (ضغطة واحدة)
-2. (اختياري) تحديث اسم مشروع Vercel لـ agentic-ai
+Critical فقط → Issue (+ webhook إن وُجد)  
+Warning → سجل فقط
