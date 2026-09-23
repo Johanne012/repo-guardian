@@ -2,7 +2,6 @@ name: Repo Guardian Health Check
 
 on:
   schedule:
-    # كل يوم 06:00 UTC ≈ 08:00 CET
     - cron: "0 6 * * *"
   workflow_dispatch:
     inputs:
@@ -29,11 +28,13 @@ jobs:
 
       - name: Run Monitor
         env:
+          # GUARDIAN_PAT (optional): classic PAT with `repo` scope for private + all public repos
+          # Falls back to GITHUB_TOKEN (limited to this repo context for some APIs)
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GUARDIAN_PAT: ${{ secrets.GUARDIAN_PAT }}
           GITHUB_OWNER: Johanne012
           REPORT_PATH: report.json
-        run: |
-          python agent/monitor.py || true
+        run: python agent/monitor.py
 
       - name: Run Decision
         env:
@@ -43,11 +44,12 @@ jobs:
 
       - name: Run Healer
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GUARDIAN_PAT || secrets.GITHUB_TOKEN }}
           GITHUB_OWNER: Johanne012
           REPORT_PATH: report.json
           AUTO_ISSUE: ${{ github.event_name == 'schedule' && 'true' || inputs.auto_issue }}
         run: python agent/healer.py
+        continue-on-error: true
 
       - name: Notify (webhooks if configured)
         env:

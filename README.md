@@ -7,55 +7,49 @@
 
 ## ماذا يفعل؟
 
-1. **Monitor** — يجلب كل المستودعات (عامة + خاصة عبر التوكن) ويفحص Vercel
+1. **Monitor** — يجلب المستودعات ويفحص Vercel
 2. **Decision** — يصنّف Critical / Warning / OK
-3. **Healer** — ينشئ Issues للحالات الحرجة (مع منع التكرار)
-4. **Notify** — Discord/Slack اختياري عبر Secrets
+3. **Healer** — ينشئ Issues (مع منع التكرار)
+4. **Notify** — Discord/Slack اختياري
 
-## التشغيل التلقائي
+## التشغيل
 
 | الحدث | الوقت |
 |-------|-------|
 | Schedule | يومياً 06:00 UTC |
 | Manual | Actions → Run workflow |
+| Local | `bash scripts/run_local.sh` |
 
-## التشغيل المحلي
+## الأسرار (Settings → Secrets and variables → Actions)
 
-```bash
-export GITHUB_TOKEN=ghp_xxx   # اختياري للمستودعات الخاصة
-bash scripts/run_local.sh
-```
+| Secret | مطلوب؟ | الغرض |
+|--------|---------|--------|
+| `GUARDIAN_PAT` | مُستحسن | Personal Access Token بصلاحية `repo` لرؤية كل المستودعات (عامة + خاصة) وإنشاء Issues فيها |
+| `DISCORD_WEBHOOK_URL` | لا | تنبيه Discord |
+| `SLACK_WEBHOOK_URL` | لا | تنبيه Slack |
 
-## الأسرار الاختيارية (Settings → Secrets)
+بدون `GUARDIAN_PAT` يعمل النظام على المستودعات العامة فقط (عبر fallback).
 
-| Secret | الغرض |
-|--------|--------|
-| `DISCORD_WEBHOOK_URL` | تنبيه Discord عند Critical |
-| `SLACK_WEBHOOK_URL` | تنبيه Slack عند Critical |
+### إنشاء GUARDIAN_PAT
 
-`GITHUB_TOKEN` يُوفَّر تلقائياً من Actions.
+1. GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Generate new token — صلاحية: **repo**
+3. الصقه كـ Secret باسم `GUARDIAN_PAT` في مستودع `repo-guardian`
 
 ## الهيكل
 
 ```
-agent/
-  monitor.py    # جمع + تحليل
-  healer.py     # Issues + dedupe
-  decision.py   # ملخص + notify.flag
-  notify.py     # webhooks
-  memory.py     # سجل القرارات
-config/
-  rules.yaml
-  repos.yaml
+agent/monitor.py decision.py healer.py notify.py memory.py
+config/rules.yaml repos.yaml
 .github/workflows/health-check.yml
 scripts/run_local.sh
 ```
 
 ## المبادئ
 
-- لا بريد/تنبيه روتيني
+- لا تنبيه روتيني
 - Critical فقط → Issue (+ webhook)
-- لا حذف ولا أرشفة تلقائية (تأكيد بشري)
+- لا حذف/أرشفة تلقائية
 - منع تكرار Issues
 
 ## الترخيص

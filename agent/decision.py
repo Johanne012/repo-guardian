@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""
-Repo Guardian — Decision
-يلخّص التقرير ويقرر هل يجب إرسال تنبيه (Critical فقط).
-"""
+"""Repo Guardian — Decision"""
 
 from __future__ import annotations
 
 import json
 import os
+import sys
+from pathlib import Path
 from typing import Any
 
 
@@ -17,29 +16,33 @@ def should_notify(report: dict[str, Any]) -> bool:
 
 def summary_markdown(report: dict[str, Any]) -> str:
     lines = [
-        f"# Repo Guardian Report",
-        f"",
+        "# Repo Guardian Report",
+        "",
         f"**Generated:** {report.get('generated_at')}",
         f"**Owner:** {report.get('owner')}",
         f"**Authenticated:** {report.get('authenticated')}",
-        f"",
-        f"| Metric | Count |",
-        f"|--------|-------|",
-        f"| Total repos | {report.get('total')} |",
-        f"| Critical | {report.get('critical_count')} |",
-        f"| Warning | {report.get('warning_count')} |",
-        f"| OK | {report.get('ok_count')} |",
-        f"",
+        "",
+        "| Metric | Count |",
+        "|--------|-------|",
+        f"| Total repos | {report.get('total', 0)} |",
+        f"| Critical | {report.get('critical_count', 0)} |",
+        f"| Warning | {report.get('warning_count', 0)} |",
+        f"| OK | {report.get('ok_count', 0)} |",
+        "",
     ]
+
+    if report.get("error"):
+        lines.append(f"> Error during fetch: `{report['error']}`")
+        lines.append("")
 
     if report.get("critical"):
         lines.append("## Critical")
         lines.append("")
         for r in report["critical"]:
-            priv = " 🔒" if r.get("private") else ""
+            priv = " (private)" if r.get("private") else ""
             lines.append(
                 f"- **{r['name']}**{priv} (score {r['score']}): "
-                f"{', '.join(r['issues'])} → `{r['action']}`"
+                f"{', '.join(r.get('issues') or [])} -> `{r.get('action')}`"
             )
         lines.append("")
 
@@ -47,7 +50,7 @@ def summary_markdown(report: dict[str, Any]) -> str:
         lines.append("## Warning")
         lines.append("")
         for r in report["warning"]:
-            lines.append(f"- **{r['name']}**: {', '.join(r['issues'])}")
+            lines.append(f"- **{r['name']}**: {', '.join(r.get('issues') or [])}")
         lines.append("")
 
     lines.append("---")
@@ -57,8 +60,26 @@ def summary_markdown(report: dict[str, Any]) -> str:
 
 def main() -> None:
     report_path = os.environ.get("REPORT_PATH", "report.json")
-    with open(report_path, encoding="utf-8") as f:
-        report = json.load(f)
+    p = Path(report_path)
+
+    if not p.exists():
+        print(f"ERROR: {report_path} not found — creating empty report")
+        report = {
+            "generated_at": None,
+            "owner": os.environ.get("GITHUB_OWNER", "unknown"),
+            "authenticated": False,
+            "total": 0,
+            "critical_count": 0,
+            "warning_count": 0,
+            "ok_count": 0,
+            "critical": [],
+            "warning": [],
+            "all": [],
+            "error": "report.json missing",
+        }
+    else:
+        with open(p, encoding="utf-8") as f:
+            report = json.load(f)
 
     md = summary_markdown(report)
     out = os.environ.get("SUMMARY_PATH", "summary.md")
@@ -72,6 +93,8 @@ def main() -> None:
 
     with open("notify.flag", "w") as f:
         f.write("yes" if notify else "no")
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":

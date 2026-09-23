@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
 Repo Guardian — Monitor
-يجمع بيانات كل المستودعات (عامة + خاصة عبر التوكن) من GitHub API
-ويحسب مؤشرات الصحة + فحص Vercel.
+يجمع بيانات المستودعات من GitHub API ويفحص Vercel.
+
+التوكن:
+  - GITHUB_TOKEN (Actions الافتراضي): محدود غالباً بمستودع واحد
+  - GUARDIAN_PAT (اختياري): Personal Access Token بصلاحية repo لرؤية كل المستودعات
 """
 
 from __future__ import annotations
@@ -16,14 +19,18 @@ from datetime import datetime, timezone
 from typing import Any
 
 OWNER = os.environ.get("GITHUB_OWNER", "Johanne012")
-TOKEN = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+TOKEN = (
+    os.environ.get("GUARDIAN_PAT")
+    or os.environ.get("GITHUB_TOKEN")
+    or os.environ.get("GH_TOKEN")
+)
 API = "https://api.github.com"
 
 
 def _headers() -> dict[str, str]:
     h = {
         "Accept": "application/vnd.github+json",
-        "User-Agent": "repo-guardian/1.0",
+        "User-Agent": "repo-guardian/1.1",
         "X-GitHub-Api-Version": "2022-11-28",
     }
     if TOKEN:
@@ -49,9 +56,7 @@ def check_url(url: str | None) -> str:
         return "no_url"
     try:
         req = urllib.request.Request(
-            url,
-            method="HEAD",
-            headers={"User-Agent": "repo-guardian/1.0"},
+            url, method="HEAD", headers={"User-Agent": "repo-guardian/1.1"}
         )
         with urllib.request.urlopen(req, timeout=8) as r:
             return "ok" if r.status < 400 else f"http_{r.status}"
@@ -62,25 +67,40 @@ def check_url(url: str | None) -> str:
 
 
 def fetch_all_repos() -> list[dict[str, Any]]:
-    """جلب كل المستودعات. مع التوكن: العامة + الخاصة. بدون توكن: العامة فقط."""
     repos: list[dict] = []
     page = 1
-    # /user/repos يحتاج auth ويرجع الخاصة أيضاً
-    base = "/user/repos" if TOKEN else f"/users/{OWNER}/repos"
-    extra = "&affiliation=owner" if TOKEN else ""
+
+    # جرّب /user/repos أولاً (يحتاج PAT كامل)، وإلا العامة
+    use_user_endpoint = bool(TOKEN)
 
     while True:
-        path = f"{base}?per_page=100&page={page}&sort=updated{extra}"
-        batch = api_get(path)
+        if use_user_endpoint:
+            path = f"/user/repos?per_page=100&page={page}&sort=updated&affiliation=owner"
+        else:
+            path = f"/users/{OWNER}/repos?per_page=100&page={page}&sort=updated"
+
+        try:
+            batch = api_get(path)
+        except urllib.error.HTTPError as e:
+            if use_user_endpoint and e.code in (401, 403):
+                print(f"warn: /user/repos failed ({e.code}), falling back to public list")
+                use_user_endpoint = False
+                page = 1
+                repos = []
+                continue
+            raise
+
         if not batch:
             break
-        # فلترة لمالك الحساب فقط عند استخدام /user/repos
-        if TOKEN:
+
+        if use_user_endpoint:
             batch = [r for r in batch if r.get("owner", {}).get("login") == OWNER]
+
         repos.extend(batch)
         if len(batch) < 100:
             break
         page += 1
+
     return repos
 
 
@@ -113,9 +133,10 @@ def analyze(repo: dict[str, Any]) -> dict[str, Any]:
             "language": repo.get("language"),
             "html_url": repo.get("html_url"),
             "archived": True,
+            "size": size,
         }
 
-    bad_name_patterns = ("Repository-name", "temp-", "untitled", "test-repo", "Fictional")
+    bad_name_patterns = ("Repository-name", "temp-", "untitled", "test-repo")
     if any(p.lower() in name.lower() for p in bad_name_patterns):
         issues.append(f"bad_name:{name}")
         severity = "critical"
@@ -128,13 +149,11 @@ def analyze(repo: dict[str, Any]) -> dict[str, Any]:
         if action == "none":
             action = "review_or_archive"
 
-    if size < 15 and days is not None and days > 30:
-        # هيكل أولي مهجور
-        if "nearly_empty" not in issues and size <= 10:
-            issues.append("skeleton_stale")
-            severity = "critical" if days > 45 else "warning"
-            if action == "none":
-                action = "confirm_archive"
+    if size <= 10 and days is not None and days > 45:
+        issues.append("skeleton_stale")
+        severity = "critical"
+        if action == "none":
+            action = "confirm_archive"
 
     if days is not None and days > 90:
         issues.append(f"stale_{days}d")
@@ -159,13 +178,7 @@ def analyze(repo: dict[str, Any]) -> dict[str, Any]:
         if severity == "info":
             severity = "warning"
 
-    score = 90
-    if severity == "warning":
-        score = 55
-    if severity == "critical":
-        score = 20
-    if not issues:
-        score = 95
+    score = 95 if not issues else (20 if severity == "critical" else 55)
 
     return {
         "name": name,
@@ -185,9 +198,25 @@ def analyze(repo: dict[str, Any]) -> dict[str, Any]:
 
 
 def run() -> dict[str, Any]:
-    repos = fetch_all_repos()
-    results = [analyze(r) for r in repos]
+    try:
+        repos = fetch_all_repos()
+    except Exception as e:
+        print(f"ERROR fetching repos: {e}")
+        return {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "owner": OWNER,
+            "authenticated": bool(TOKEN),
+            "error": str(e),
+            "total": 0,
+            "critical_count": 0,
+            "warning_count": 0,
+            "ok_count": 0,
+            "critical": [],
+            "warning": [],
+            "all": [],
+        }
 
+    results = [analyze(r) for r in repos]
     critical = [r for r in results if r["severity"] == "critical"]
     warning = [r for r in results if r["severity"] == "warning"]
     ok = [r for r in results if r["severity"] == "info"]
@@ -213,25 +242,25 @@ def main() -> None:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
     print(f"Repo Guardian Report — {report['generated_at']}")
-    print(f"Auth: {report['authenticated']} | Total: {report['total']} | "
-          f"Critical: {report['critical_count']} | Warning: {report['warning_count']} | OK: {report['ok_count']}")
-    print()
+    print(
+        f"Auth: {report['authenticated']} | Total: {report['total']} | "
+        f"Critical: {report['critical_count']} | Warning: {report['warning_count']} | OK: {report['ok_count']}"
+    )
+    if report.get("error"):
+        print(f"ERROR: {report['error']}")
 
     if report["critical"]:
         print("=== CRITICAL ===")
         for r in report["critical"]:
             priv = " [private]" if r.get("private") else ""
             print(f"  [{r['score']}] {r['name']}{priv}: {', '.join(r['issues'])} → {r['action']}")
-        print()
 
     if report["warning"]:
         print("=== WARNING ===")
         for r in report["warning"]:
             print(f"  [{r['score']}] {r['name']}: {', '.join(r['issues'])}")
-        print()
 
-    if report["critical_count"] > 0:
-        sys.exit(1)
+    # لا نخرج بـ exit 1 حتى لا نكسر الـ pipeline؛ القرار في decision.py
     sys.exit(0)
 
 
