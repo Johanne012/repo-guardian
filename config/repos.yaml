@@ -1,0 +1,52 @@
+# قائمة المستودعات وأولوياتها
+
+owner: Johanne012
+
+repos:
+  - name: Repository-name-my-ai-platform
+    priority: critical
+    action_needed: rename_to_agentic-ai
+    notes: اسم مؤقت، يجب تغييره فوراً
+
+  - name: free-claude-gateway
+    priority: high
+    notes: أقوى مشروع تقني حالياً
+
+  - name: zyntra-platform
+    priority: high
+
+  - name: nexusai-commerce
+    priority: medium
+
+  - name: MirrorThread
+    priority: medium
+
+  - name: crypto-portfolio
+    priority: medium
+    live_url: https://crypto-portfolio-rust.vercel.app
+
+  - name: zyntra-flowbrief
+    priority: medium
+    live_url: https://zyntra-flowbrief.vercel.app
+
+  - name: gabster-ai-agent-kit
+    priority: low
+
+  - name: e-myth-business-system
+    priority: low
+
+  - name: content-scarcity-canvas
+    priority: low
+
+  - name: forge-agent
+    priority: review
+    action_needed: decide_develop_or_archive
+
+  - name: ZYNTRA-storage
+    priority: archive
+    action_needed: archive
+    notes: Vercel 404 + قديم جداً
+
+  - name: Zyntrabusinesszyntraal-
+    priority: archived
+    notes: مؤرشف مسبقاً

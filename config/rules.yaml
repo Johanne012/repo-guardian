@@ -1,0 +1,40 @@
+# قواعد تقييم الصحة والخطورة
+
+rules:
+  - id: bad_name
+    description: اسم مستودع مؤقت أو سيء
+    pattern: "Repository-name|temp-|test-|untitled"
+    severity: critical
+    action: confirm_rename
+
+  - id: vercel_404
+    description: رابط Vercel يعطي 404
+    severity: critical
+    action: confirm_archive
+
+  - id: no_activity_60d
+    description: لا يوجد push منذ أكثر من 60 يوماً
+    severity: warning
+    action: log_only
+
+  - id: no_readme
+    description: لا يوجد README أو README فارغ
+    severity: critical
+    action: create_issue
+
+  - id: empty_repo
+    description: حجم صغير جداً + ملفات قليلة
+    severity: warning
+    action: review
+
+  - id: open_issues_old
+    description: Issues مفتوحة لأكثر من 30 يوماً بدون رد
+    severity: warning
+    action: log_only
+
+email_policy:
+  send_only_on:
+    - critical
+    - confirm
+  never_send_weekly_summary: true
+  never_send_info_or_warning: true
